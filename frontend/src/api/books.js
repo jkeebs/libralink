@@ -34,3 +34,9 @@ export const returnBook = async (qrIdentifier) => {
   if (!res.ok) throw new Error("Failed to return book");
   return res.json();
 };
+
+export const deleteBook = async (id) => {
+  const res = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete book");
+  return res.json();
+};

@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Small rounded button to apply across the app */
+.btn-rounded-small {
+	@apply rounded-md; /* Tailwind medium rounded */
+}

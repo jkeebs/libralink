@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
+import { deleteBook as apiDeleteBook } from "../api/books";
 
 const API_URL = "http://localhost:5000/api/books"; // adjust if needed
 
 const BookList = () => {
   const [books, setBooks] = useState([]);
+  const [generating, setGenerating] = useState({});
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
+  const [isbn, setIsbn] = useState("");
+  
 
   // Fetch books from backend
   const loadBooks = async () => {
@@ -29,7 +33,7 @@ const BookList = () => {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, author }),
+        body: JSON.stringify({ title, author, isbn }),
       });
       const result = await res.json();
 
@@ -37,6 +41,7 @@ const BookList = () => {
         setBooks((prevBooks) => [...prevBooks, result.data]);
         setTitle("");
         setAuthor("");
+        setIsbn("");
       } else {
         console.error("Failed to add book:", result.message);
       }
@@ -89,7 +94,7 @@ const BookList = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">School Library</h1>
+      <h1 className="text-2xl font-bold mb-4">Add a Book</h1>
 
       {/* Add Book Form */}
       <form onSubmit={handleAddBook} className="flex gap-2 mb-6">
@@ -109,6 +114,13 @@ const BookList = () => {
           className="input input-bordered"
           required
         />
+        <input
+          type="text"
+          placeholder="ISBN (optional)"
+          value={isbn}
+          onChange={(e) => setIsbn(e.target.value)}
+          className="input input-bordered"
+        />
         <button type="submit" className="btn btn-success">
           Add Book
         </button>
@@ -123,6 +135,7 @@ const BookList = () => {
             <div key={book._id} className="card bg-base-100 shadow-md p-4">
               <h3 className="font-bold text-lg">{book.title}</h3>
               <p>{book.author}</p>
+              {book.isbn && <p className="text-sm">ISBN: {book.isbn}</p>}
               <p>Status: {book.isBorrowed ? "Borrowed" : "Available"}</p>
               {book.qrIdentifier && (
                 <img
@@ -130,6 +143,38 @@ const BookList = () => {
                   alt="QR Code"
                   className="my-2"
                 />
+              )}
+              {!book.qrIdentifier && (
+                <button
+                  className="btn btn-outline btn-sm my-2"
+                  onClick={async () => {
+                    // prevent double-clicks
+                    if (generating[book._id]) return;
+                    setGenerating((s) => ({ ...s, [book._id]: true }));
+                    try {
+                      const qrIdentifier = `LIB-${book._id}`;
+                      const res = await fetch(`${API_URL}/${book._id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ qrIdentifier }),
+                      });
+                      const result = await res.json();
+                      if (result.success) {
+                        setBooks((prevBooks) =>
+                          prevBooks.map((b) => (b._id === book._id ? result.data : b))
+                        );
+                      } else {
+                        console.error("Failed to generate QR:", result.message);
+                      }
+                    } catch (err) {
+                      console.error("Failed to generate QR:", err);
+                    } finally {
+                      setGenerating((s) => ({ ...s, [book._id]: false }));
+                    }
+                  }}
+                >
+                  {generating[book._id] ? "Generating..." : "Generate QR"}
+                </button>
               )}
               {!book.isBorrowed ? (
                 <button
@@ -146,6 +191,20 @@ const BookList = () => {
                   Return
                 </button>
               )}
+              <button
+                className="btn btn-ghost btn-sm ml-2"
+                onClick={async () => {
+                  if (!confirm(`Delete '${book.title}'? This cannot be undone.`)) return;
+                  try {
+                    await apiDeleteBook(book._id);
+                    setBooks((prev) => prev.filter((b) => b._id !== book._id));
+                  } catch (err) {
+                    console.error("Failed to delete book:", err);
+                  }
+                }}
+              >
+                Delete
+              </button>
             </div>
           ))}
         </div>
@@ -153,5 +212,9 @@ const BookList = () => {
     </div>
   );
 };
+
+// delete book component 
+
+
 
 export default BookList;
